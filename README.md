@@ -13,24 +13,33 @@ up a binary parser iteratively.
 
  [1]: https://github.com/ztellman/gloss
 
-## Releases and Dependency Information
+### Installation
 
-There have been no releases yet.
+Blobbity is available on Clojars. Add this `dependency` to your
+Leiningen `project.clj`:
+
+```clojure
+[org.clojars.algernon/balabit.blobbity "0.1.0-SNAPSHOT"]
+```
 
 ## Usage
 
 Examples:
 
-    (require '[balabit.blobbity :as blob])
+```clojure
+(require '[balabit.blobbity :as blob])
+```
 
 To extract information from a buffer that has a 4-byte magic
 identifier, followed by a 16-bit header length, and a 32-bit offset,
 pointing to the end of the last written record, one can use the
 following spec:
 
-    (blob/read-spec buffer [:magic [:string 4]
-                            :header-len :uint16
-                            :tail-offset :uint32])
+```clojure
+(blob/read-spec buffer [:magic [:string 4]
+                         :header-len :uint16
+                         :tail-offset :uint32])
+```
 
 ## License
 
