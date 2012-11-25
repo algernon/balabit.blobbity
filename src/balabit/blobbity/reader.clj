@@ -119,6 +119,16 @@
 
   (read-spec buffer struct-spec))
 
+;; Binary files sometimes contain padding, which we do not wish to
+;; read at all, just to discard them. The `:skip` method comes in
+;; handy in these cases, as it simply positions the buffer a few bytes
+;; further.
+(defmethod read-element :skip
+  [#^ByteBuffer buffer _ n]
+
+  (.position buffer (+ (.position buffer) n))
+  nil)
+
 ;; ----------------------------------------------------------------
 
 (defmulti read-spec-dispatch
@@ -142,6 +152,25 @@
 
   (read-element buffer type options))
 
+(defn- spec-dispatch
+  "Used by `read-spec`, this function receives a buffer, a map and a
+  key-spec pair, and depending on a few things, decides how to proceed
+  with them.
+
+  If the key is `:skip`, then it will skip as many bytes as specified,
+  otherwise it will dispatch to `read-spec-dispatch` to get the value,
+  and assoc it into the result if it is not `nil`. If it is, the map
+  will be returned unchanged."
+
+  [buffer m [key elem-spec]]
+
+  (if (= key :skip)
+    (read-element buffer :skip elem-spec)
+    (let [v (read-spec-dispatch buffer elem-spec)]
+      (if v
+        (assoc m key v)
+        m))))
+
 (defn read-spec
   "Read multiple elements from a ByteBuffer, according to a
   specification. The specification is a vector of key-value pairs,
@@ -157,7 +186,4 @@
   [#^ByteBuffer buffer spec]
 
   (assert (even? (count spec)))
-  (let [pairs (partition 2 spec)
-        assoc-fn (fn [m [key elem-spec]]
-                   (assoc m key (read-spec-dispatch buffer elem-spec)))]
-    (reduce assoc-fn {} pairs)))
+  (reduce (partial spec-dispatch buffer) {} (partition 2 spec)))

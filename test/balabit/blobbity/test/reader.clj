@@ -125,3 +125,14 @@
             :strings {:prefixed "h"
                       :string "MAGIC"
                       :c-string "c-string"}}))))
+
+(def skip-spec
+  [:dummy [:skip 4]
+   :skip 2
+   :byte :byte])
+
+(deftest read-spec-with-skips
+  (testing "blob/read-spec with various kinds of skipping"
+
+    (is (= (blob/read-spec (spec-buffer) skip-spec)
+           {:byte -1}))))
