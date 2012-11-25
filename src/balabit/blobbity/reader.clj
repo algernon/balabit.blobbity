@@ -11,7 +11,7 @@
     :license {:name "GNU General Public License - v3"
               :url "http://www.gnu.org/licenses/gpl.txt"}}
 
-  (:use balabit.blobbity.typecast)
+  (:use [balabit.blobbity.typecast])
   (:import (java.nio ByteBuffer)))
 
 ;; We need to pre-declare read-spec, because certain readers
@@ -29,7 +29,7 @@
 
   {:arglists '([buffer type & options])}
 
-  (fn [#^ByteBuffer buffer type & params] type))
+  (fn [#^ByteBuffer _ type & _] type))
 
 (defmacro defelement-reader
   "Create a method for the `read-element` multi-method (using
@@ -39,7 +39,7 @@
 
   [dispatch getter typecast transform]
 
-  `(defmethod read-element ~dispatch [#^ByteBuffer buffer# _#]
+  `(defmethod read-element ~dispatch [#^ByteBuffer buffer# ~'_]
      (-> (~getter buffer#)
          (~typecast)
          (~transform))))
@@ -97,7 +97,7 @@
 
   (loop [acc []]
     (let [c (read-element buffer :byte)]
-      (if (= c 0)
+      (if (zero? c)
         (String. (byte-array acc))
         (recur (conj acc c))))))
 
@@ -127,7 +127,7 @@
 
   {:arglists '([buffer type] [buffer [type params]])}
 
-  (fn [#^ByteBuffer buffer options]
+  (fn [#^ByteBuffer _ options]
     (class options)))
 
 ;; If the elem-spec is a keyword, pass it on to read-element as-is.
