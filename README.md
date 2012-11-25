@@ -45,7 +45,4 @@ following spec:
 
 Copyright © 2012 Gergely Nagy <algernon@balabit.hu>
 
-Distributed under the [GNU General Public License][2], version 3 or
-later.
-
- [2]: http://www.gnu.org/licenses/gpl.html
+Distributed under the Eclipse Public License, which is also used by Clojure.

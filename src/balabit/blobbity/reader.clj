@@ -8,8 +8,8 @@
 
   ^{:author "Gergely Nagy <algernon@balabit.hu>"
     :copyright "Copyright (C) 2012 Gergely Nagy <algernon@balabit.hu>"
-    :license {:name "GNU General Public License - v3"
-              :url "http://www.gnu.org/licenses/gpl.txt"}}
+    :license {:name "Eclipse Public License - v 1.0"
+              :url "http://www.eclipse.org/legal/epl-v10.html"}}
 
   (:use [balabit.blobbity.typecast])
   (:import (java.nio ByteBuffer)))
