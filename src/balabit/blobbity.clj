@@ -189,3 +189,15 @@
 
   (assert (even? (count spec)))
   (reduce (partial spec-dispatch buffer) {} (partition 2 spec)))
+
+(defn decode-blob-array
+  "Decode all frames of the same type from a ByteBuffer. Use this when
+  you have a buffer that contains an unspecified number of frames of
+  the same type."
+
+  [#^ByteBuffer buffer type]
+
+  (loop [acc []]
+    (if (= (.position buffer) (.limit buffer))
+      acc
+      (recur (conj acc (decode-frame buffer type))))))

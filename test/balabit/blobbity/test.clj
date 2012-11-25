@@ -135,3 +135,8 @@
                        :byte :byte]]
         (is (= (blob/decode-blob (make-test-buffer) skip-spec)
                {:byte -1}))))))
+
+(deftest decode-blob-array-test
+  (testing "Decoding multiple homogenous frames from a ByteBuffer"
+    (is (= (blob/decode-blob-array (minus-one-buffer 10) :byte)
+           [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]))))
