@@ -9,6 +9,13 @@
 (defn wrap-string-in-buffer [string]
   (ByteBuffer/wrap (byte-array (map #(byte (int %1)) string))))
 
+(defn wrap-string-in-prefixed-buffer [string]
+  (let [buffer (byte-array (+ 4 (count string)))
+        b (ByteBuffer/wrap buffer)]
+    (.putInt b (count string))
+    (dorun (map #(.put b (byte (int %1))) string))
+    (.position b 0)))
+
 (defn spec-buffer []
   (ByteBuffer/wrap
    (byte-array
@@ -39,7 +46,12 @@
                  (byte -1)
                  (byte -1)
                  (byte -1)
-                 (byte -1)]
+                 (byte -1)
+
+                 ; prefixed-string
+                 (byte 1)
+                 (byte (int \h))
+                 ]
 
            (apply conj
                   (vec (doall (map #(byte (int %1)) "MAGIC")))
@@ -52,6 +64,7 @@
    :magic-ubyte :ubyte
    :magic-int64 :int64
    :magic-uint64 :uint64
+   :magic-prefixed-string [:prefixed-string :byte]
    :magic-string [:string 5]
    :magic-c-string :c-string])
 
@@ -67,7 +80,10 @@
     (is (= (blob/read-element (minus-one-buffer 8) :uint64) 18446744073709551615N))
 
     (is (= (blob/read-element (wrap-string-in-buffer "MAGIC") :string 5) "MAGIC"))
-    (is (= (blob/read-element (wrap-string-in-buffer "MAGIC\0") :c-string) "MAGIC"))))
+    (is (= (blob/read-element (wrap-string-in-buffer "MAGIC\0") :c-string) "MAGIC"))
+
+    (is (= (blob/read-element (wrap-string-in-prefixed-buffer "Awesome!")
+                              :prefixed-string :int32) "Awesome!"))))
 
 (deftest read-spec
   (testing "blob/read-spec"
@@ -79,4 +95,5 @@
             :magic-int64 -1
             :magic-uint64 18446744073709551615N
             :magic-string "MAGIC"
+            :magic-prefixed-string "h"
             :magic-c-string "c-string"}))))

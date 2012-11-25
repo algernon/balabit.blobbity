@@ -97,6 +97,17 @@
         (String. (byte-array acc))
         (recur (conj acc c))))))
 
+;; A construct that can be observed often, is a length-prefixed
+;; string. To make it easy to read these, `:prefixed-string` can be
+;; used, which takes a single parameter, the type of the prefix.
+(defmethod read-element :prefixed-string
+  [#^ByteBuffer buffer _ prefix-type]
+
+  (let [len (read-element buffer prefix-type)]
+    (read-element buffer :string len)))
+
+;; ----------------------------------------------------------------
+
 (defmulti read-spec-dispatch
   "Given an element spec, dispatch it to the appropriate
   `read-element` call."
