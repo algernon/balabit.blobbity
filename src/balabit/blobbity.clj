@@ -131,6 +131,17 @@
   (.position buffer (+ (.position buffer) n))
   nil)
 
+;; And for those cases where one needs a subsection of the buffer to
+;; do further decoding upon, the `:slice` decoder can be used. Give it
+;; a length, and it will spit out a ByteBuffer that starts at the
+;; current buffer position, limited to the specified length.
+(defmethod decode-frame :slice
+  [buffer _ length]
+
+  (let [blob (-> buffer .slice (.limit length) (.order (.order buffer)))]
+    (decode-frame buffer :skip length)
+    blob))
+
 ;; ----------------------------------------------------------------
 
 (defmulti decoder-dispatch

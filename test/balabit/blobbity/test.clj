@@ -81,7 +81,9 @@
 
       (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC")
                                 :struct [:magic? [:string 5]])
-             {:magic? "MAGIC"})))))
+             {:magic? "MAGIC"}))
+
+      (is (= (.limit (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2)))))
 
 (deftest decode-blob-test
   (testing "Blob decoding"
@@ -134,7 +136,22 @@
                        :skip 2
                        :byte :byte]]
         (is (= (blob/decode-blob (make-test-buffer) skip-spec)
-               {:byte -1}))))))
+               {:byte -1}))))
+
+    (testing "with slicing the buffer up in the process"
+      (let [test-buffer (make-test-buffer)
+            outer-spec [:two-ints [:slice 6]
+                        :byte :byte]
+            inner-spec [:int32 :int32
+                        :int16 :int16]
+            ubyte-spec [:ubyte :ubyte]
+
+            inner-stuff (blob/decode-blob test-buffer outer-spec)]
+        (is (= (:byte inner-stuff) -1))
+        (is (= (blob/decode-blob test-buffer ubyte-spec) {:ubyte 255}))
+        (is (= (blob/decode-blob (:two-ints inner-stuff) inner-spec)
+               {:int32 16843009
+                :int16 514}))))))
 
 (deftest decode-blob-array-test
   (testing "Decoding multiple homogenous frames from a ByteBuffer"
