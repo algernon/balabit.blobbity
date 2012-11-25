@@ -14,6 +14,10 @@
   (:use balabit.blobbity.typecast)
   (:import (java.nio ByteBuffer)))
 
+;; We need to pre-declare read-spec, because certain readers
+;; (`:struct`, in particular) will need to use it.
+(declare read-spec)
+
 (defmulti read-element
   "Read a single element from a `ByteBuffer` of the specified type.
   Depending on the type, one or more options may be specified.
@@ -105,6 +109,15 @@
 
   (let [len (read-element buffer prefix-type)]
     (read-element buffer :string len)))
+
+;; Mostly for aesthetic reasons, it is sometimes advisable to have
+;; deeper nesting in the returned map. This is best achieved by
+;; introducing a special `:struct` reader, which dispatches to
+;; `read-spec`, defined just below.
+(defmethod read-element :struct
+  [#^ByteBuffer buffer _ struct-spec]
+
+  (read-spec buffer struct-spec))
 
 ;; ----------------------------------------------------------------
 
