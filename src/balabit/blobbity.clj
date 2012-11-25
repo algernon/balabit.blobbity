@@ -1,7 +1,7 @@
-(ns balabit.blobbity.reader
-  "Binary blob reader functions.
+(ns balabit.blobbity
+  "Binary blob decoding functions.
 
-  Within this namespace live two functions and a macro, all tailored
+  Within this namespace live a few functions and macros, all tailored
   towards one single purpose: extracting various primitive types out
   of a ByteBuffer. The goal is to be able to write a simple C
   struct-like specification for this purpose."
@@ -14,116 +14,118 @@
   (:use [balabit.blobbity.typecast])
   (:import (java.nio ByteBuffer)))
 
-;; We need to pre-declare read-spec, because certain readers
-;; (`:struct`, in particular) will need to use it.
-(declare read-spec)
+;; We need to pre-declare `decode-blob`, because certain frame
+;; decoders (`:struct`, in particular) will need to use it.
+(declare decode-blob)
 
-(defmulti read-element
-  "Read a single element from a `ByteBuffer` of the specified type.
+(defmulti decode-frame
+  "Decode a single frame from a `ByteBuffer` of the specified type.
   Depending on the type, one or more options may be specified.
 
   Examples:
 
-    (read-element buffer :byte) ;=> 42
-    (read-element buffer :string 5) ;=> \"MAGIC\""
+    (decode-frame buffer :byte) ;=> 42
+    (decode-frame buffer :string 5) ;=> \"MAGIC\""
 
   {:arglists '([buffer type & options])}
 
   (fn [#^ByteBuffer _ type & _] type))
 
-(defmacro defelement-reader
-  "Create a method for the `read-element` multi-method (using
-  `dispatch`), one that uses `getter` to extract the value, `typecast`
-  to coerce the results into a given type, and finally, apply the
-  `transform` function before returning."
+(defmacro defdfm
+  "Create and install a frame decoding method for a particular `type`,
+  using `getter` to extract the value from a ByteBuffer, `typecast` to
+  coerce the result into a given type, and `transform` to bring the
+  data to its final shape.
 
-  [dispatch getter typecast transform]
+  All parameters except for `type` must be callable functions."
 
-  `(defmethod read-element ~dispatch [#^ByteBuffer buffer# ~'_]
+  [type getter typecast transform]
+
+  `(defmethod decode-frame ~type [#^ByteBuffer buffer# ~'_]
      (-> (~getter buffer#)
          (~typecast)
          (~transform))))
 
-;; Reading a signed byte is done via the `get` method of
-;; ByteBuffer. The result is coerced into a byte, and no transformation
-;; is applied.
-(defelement-reader :byte .get byte identity)
-;; Reading an unsigned byte is similar, with the difference being that
+;; Decoding a signed byte is done via the `get` method of
+;; ByteBuffer. The result is coerced into a byte, and no
+;; transformation is applied.
+(defdfm :byte .get byte identity)
+;; Decoding an unsigned byte is similar, with the difference being that
 ;; a byte->ubyte transformation gets applied too.
-(defelement-reader :ubyte .get byte byte->ubyte)
+(defdfm :ubyte .get byte byte->ubyte)
 
-;; Reading a signed 16-bit integer is doen via the `getShort' method
+;; Decoding a signed 16-bit integer is doen via the `getShort' method
 ;; of ByteBuffer. The result is coerced into a short, and no
 ;; transformation is applied.
-(defelement-reader :int16 .getShort short identity)
-;; Reading an unsigned 16-bit integer is similar, with the difference
+(defdfm :int16 .getShort short identity)
+;; Decoding an unsigned 16-bit integer is similar, with the difference
 ;; being that a short->ushort transformation gets applied too.
-(defelement-reader :uint16 .getShort short short->ushort)
+(defdfm :uint16 .getShort short short->ushort)
 
-;; Reading a signed 32-bit integer is doen via the `getInt' method
-;; of ByteBuffer. The result is coerced into a short, and no
+;; Decoding a signed 32-bit integer is doen via the `getInt' method of
+;; ByteBuffer. The result is coerced into a short, and no
 ;; transformation is applied.
-(defelement-reader :int32 .getInt int identity)
-;; Reading an unsigned 32-bit integer is similar, with the difference
+(defdfm :int32 .getInt int identity)
+;; Decoding an unsigned 32-bit integer is similar, with the difference
 ;; being that a int->uint transformation gets applied too.
-(defelement-reader :uint32 .getInt int int->uint)
+(defdfm :uint32 .getInt int int->uint)
 
-;; Reading a signed 64-bit integer is doen via the `getLong' method
+;; Decoding a signed 64-bit integer is doen via the `getLong' method
 ;; of ByteBuffer. The result is coerced into a short, and no
 ;; transformation is applied.
-(defelement-reader :int64 .getLong long identity)
-;; Reading an unsigned 64-bit integer is similar, with the difference
+(defdfm :int64 .getLong long identity)
+;; Decoding an unsigned 64-bit integer is similar, with the difference
 ;; being that a long->ulong transformation gets applied too.
-(defelement-reader :uint64 .getLong long long->ulong)
+(defdfm :uint64 .getLong long long->ulong)
 
-;; Reading a string of a specific length is done by reading the
+;; Decoding a string of a specific length is done by reading the
 ;; required amount of bytes into an array, and turning that back into
 ;; a string.
-(defmethod read-element :string
+(defmethod decode-frame :string
   [#^ByteBuffer buffer _ length]
 
   (let [b (byte-array length)
         _ (.get buffer b)]
     (String. b)))
 
-;; Reading NULL-terminated C-like strings is slightly more
+;; Decoding NULL-terminated C-like strings is slightly more
 ;; complicated, as the buffer must be read until the first NULL-byte
 ;; only, but we have no indication of its length.
 ;;
 ;; The result shall be the string itself, without the trailing
 ;; NULL-byte.
-(defmethod read-element :c-string
+(defmethod decode-frame :c-string
   [#^ByteBuffer buffer _]
 
   (loop [acc []]
-    (let [c (read-element buffer :byte)]
+    (let [c (decode-frame buffer :byte)]
       (if (zero? c)
         (String. (byte-array acc))
         (recur (conj acc c))))))
 
 ;; A construct that can be observed often, is a length-prefixed
-;; string. To make it easy to read these, `:prefixed-string` can be
+;; string. To make it easy to decode these, `:prefixed-string` can be
 ;; used, which takes a single parameter, the type of the prefix.
-(defmethod read-element :prefixed-string
+(defmethod decode-frame :prefixed-string
   [#^ByteBuffer buffer _ prefix-type]
 
-  (let [len (read-element buffer prefix-type)]
-    (read-element buffer :string len)))
+  (let [len (decode-frame buffer prefix-type)]
+    (decode-frame buffer :string len)))
 
 ;; Mostly for aesthetic reasons, it is sometimes advisable to have
 ;; deeper nesting in the returned map. This is best achieved by
-;; introducing a special `:struct` reader, which dispatches to
-;; `read-spec`, defined just below.
-(defmethod read-element :struct
+;; introducing a special `:struct` frame decoder, which dispatches to
+;; `decode-blob`, defined just below.
+(defmethod decode-frame :struct
   [#^ByteBuffer buffer _ struct-spec]
 
-  (read-spec buffer struct-spec))
+  (decode-blob buffer struct-spec))
 
 ;; Binary files sometimes contain padding, which we do not wish to
 ;; read at all, just to discard them. The `:skip` method comes in
 ;; handy in these cases, as it simply positions the buffer a few bytes
 ;; further.
-(defmethod read-element :skip
+(defmethod decode-frame :skip
   [#^ByteBuffer buffer _ n]
 
   (.position buffer (+ (.position buffer) n))
@@ -131,9 +133,9 @@
 
 ;; ----------------------------------------------------------------
 
-(defmulti read-spec-dispatch
+(defmulti decoder-dispatch
   "Given an element spec, dispatch it to the appropriate
-  `read-element` call."
+  `decode-frame` call."
 
   {:arglists '([buffer type] [buffer [type params]])}
 
@@ -141,47 +143,47 @@
     (class options)))
 
 ;; If the elem-spec is a keyword, pass it on to read-element as-is.
-(defmethod read-spec-dispatch clojure.lang.Keyword
+(defmethod decoder-dispatch clojure.lang.Keyword
   [#^ByteBuffer buffer type]
-  (read-element buffer type))
+  (decode-frame buffer type))
 
 ;; If the elem-spec is not a keyword, then assume it is a [type
 ;; options] vector, so destructure it, and pass it onwards.
-(defmethod read-spec-dispatch :default
+(defmethod decoder-dispatch :default
   [#^ByteBuffer buffer [type options]]
 
-  (read-element buffer type options))
+  (decode-frame buffer type options))
 
 (defn- spec-dispatch
-  "Used by `read-spec`, this function receives a buffer, a map and a
+  "Used by `decode-blob`, this function receives a buffer, a map and a
   key-spec pair, and depending on a few things, decides how to proceed
   with them.
 
   If the key is `:skip`, then it will skip as many bytes as specified,
-  otherwise it will dispatch to `read-spec-dispatch` to get the value,
+  otherwise it will dispatch to `decoder-dispatch` to get the value,
   and assoc it into the result if it is not `nil`. If it is, the map
   will be returned unchanged."
 
   [buffer m [key elem-spec]]
 
   (if (= key :skip)
-    (read-element buffer :skip elem-spec)
-    (let [v (read-spec-dispatch buffer elem-spec)]
+    (decode-frame buffer :skip elem-spec)
+    (let [v (decoder-dispatch buffer elem-spec)]
       (if v
         (assoc m key v)
         m))))
 
-(defn read-spec
-  "Read multiple elements from a ByteBuffer, according to a
+(defn decode-blob
+  "Decode multiple frames from a ByteBuffer, according to a
   specification. The specification is a vector of key-value pairs,
-  where the values will be used to dispatch `read-element` on. If the
+  where the values will be used to dispatch `decode-frame` on. If the
   particular type needs extra arguments, then the type itself and the
   extra parameters must be put in a vector.
 
   Examples:
 
-    (read-spec buffer [:magic [:string 4]
-                       :header-length :uint32])"
+    (decode-blob buffer [:magic [:string 4]
+                         :header-length :uint32])"
 
   [#^ByteBuffer buffer spec]
 

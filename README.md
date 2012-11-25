@@ -36,9 +36,9 @@ pointing to the end of the last written record, one can use the
 following spec:
 
 ```clojure
-(blob/read-spec buffer [:magic [:string 4]
-                        :header-len :uint16
-                        :tail-offset :uint32])
+(blob/decode-blob buffer [:magic [:string 4]
+                          :header-len :uint16
+                          :tail-offset :uint32])
 ```
 
 ## License
