@@ -156,4 +156,12 @@
 (deftest decode-blob-array-test
   (testing "Decoding multiple homogenous frames from a ByteBuffer"
     (is (= (blob/decode-blob-array (minus-one-buffer 10) :byte)
-           [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]))))
+           [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]))
+
+    (testing "... lazily"
+      (let [buff (minus-one-buffer 10)]
+        (is (= (take 2 (blob/decode-blob-array buff :byte))
+               [-1 -1]))
+        (is (= (.position buff) 2))
+        (is (= (blob/decode-blob-array buff :byte)
+               [-1 -1 -1 -1 -1 -1 -1 -1]))))))
