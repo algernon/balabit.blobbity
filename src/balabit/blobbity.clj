@@ -136,11 +136,12 @@
 ;; a length, and it will spit out a ByteBuffer that starts at the
 ;; current buffer position, limited to the specified length.
 (defmethod decode-frame :slice
-  [buffer _ length]
+  [#^ByteBuffer buffer _ length]
 
-  (let [blob (-> buffer .slice (.limit length) (.order (.order buffer)))]
+  (let [order (.order buffer)
+        #^ByteBuffer blob (-> buffer .slice (.limit length))]
     (decode-frame buffer :skip length)
-    blob))
+    (.order blob order)))
 
 ;; ----------------------------------------------------------------
 
@@ -210,8 +211,8 @@
 
   [#^ByteBuffer buffer type]
 
-  (let [step (fn [s buffer type]
+  (let [step (fn [#^ByteBuffer buffer type]
                (when-not (= (.position buffer) (.limit buffer))
                  (cons (decode-frame buffer type)
                        (decode-blob-array buffer type))))]
-    (lazy-seq (step [] buffer type))))
+    (lazy-seq (step buffer type))))

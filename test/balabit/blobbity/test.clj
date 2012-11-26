@@ -83,7 +83,7 @@
                                 :struct [:magic? [:string 5]])
              {:magic? "MAGIC"}))
 
-      (is (= (.limit (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2)))))
+      (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2)))))
 
 (deftest decode-blob-test
   (testing "Blob decoding"
@@ -159,7 +159,7 @@
            [-1 -1 -1 -1 -1 -1 -1 -1 -1 -1]))
 
     (testing "... lazily"
-      (let [buff (minus-one-buffer 10)]
+      (let [#^ByteBuffer buff (minus-one-buffer 10)]
         (is (= (take 2 (blob/decode-blob-array buff :byte))
                [-1 -1]))
         (is (= (.position buff) 2))
