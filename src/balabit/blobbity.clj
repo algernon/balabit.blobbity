@@ -228,7 +228,25 @@
 ;; it: we can build a function to which we can give a C struct-like
 ;; specification, and it will returns us a map of data. We'll call
 ;; this function `decode-blob`, but we will have to implement a few
-;; helper functions first:
+;; helper functions first.
+;;
+;; The spec we want is flexible: it is a vector of key-value pairs,
+;; where the value can be another vector of the type and optional
+;; parameters (eg, in case of `:string`, it needs an extra length
+;; argument).
+;;
+;; We want the folling spec to be valid:
+;;
+;;     [:magic [:string 4]
+;;      :tail-offset :uint64]
+;;
+;; ### Helper functions
+;;
+;; For this to work, we need a helper function that can decide how to
+;; use the value, whether to expect an argument, or just a type.
+;;
+;; This is `decoder-dispatch`:
+;;
 
 (defmulti decoder-dispatch
   "Given an element spec, dispatch it to the appropriate
@@ -251,7 +269,17 @@
 
   (decode-frame buffer type options))
 
-(defn- spec-dispatch
+;;
+;; We also want to allow one to easily skip parts of a binary blob,
+;; and skipping does not need, and should not need a dummy key
+;; name. Instead, skipping should be inlineable, with `:skip` taking
+;; the place of the key, and its argument the place of value:
+;;
+;;     [:magic [:string 4]
+;;      :skip 128]
+;;
+
+(defn- skip-or-decode
   "Used by `decode-blob`, this function receives a buffer, a map and a
   key-spec pair, and depending on a few things, decides how to proceed
   with them.
@@ -270,6 +298,10 @@
         (assoc m key v)
         m))))
 
+;;
+;; ### Decoding a set of frames
+;;
+
 (defn decode-blob
   "Decode multiple frames from a ByteBuffer, according to a
   specification. The specification is a vector of key-value pairs,
@@ -285,7 +317,7 @@
   [#^ByteBuffer buffer spec]
 
   (assert (even? (count spec)))
-  (reduce (partial spec-dispatch buffer) {} (partition 2 spec)))
+  (reduce (partial skip-or-decode buffer) {} (partition 2 spec)))
 
 (defn decode-blob-array
   "Decode all frames of the same type from a ByteBuffer. Use this when

@@ -7,4 +7,5 @@
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :profiles {:dev {:plugins [[lein-marginalia "0.7.1"]]}}
-  :aliases {"docs" ["with-profile" "dev" "marg"]})
+  :aliases {"docs" ["with-profile" "dev" "marg"
+                    "src/balabit/blobbity.clj"]})
