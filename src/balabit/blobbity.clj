@@ -1,11 +1,36 @@
+;; ## Decoding binary data
+;;
+;; Most often, when one needs to interface with other software, there
+;; is already an established communication protocol, and libraries to
+;; faciliate the communication. However, there are times when that is
+;; not the case, and while a protocol exists, one needs to write the
+;; library himself. To add insult to injury, if this protocol - or
+;; file format - happens to be binary, decoding data out of it from
+;; within Clojure is not an easy task.
+;;
+;; There is, of course, [Gloss][1], a powerful library of byte format
+;; DSL, but it has its share of problems too: namely that it appears
+;; to be designed to consume the whole thing (whatever the thing may
+;; be), so working with it iteratively is quite a challenge. This is a
+;; major issue when developing a library for a format not well
+;; understood: one needs to be able to easily say: "get me this
+;; structure, from this position onwards, I don't care what is in
+;; there before or after it."
+;;
+;;  [1]: https://github.com/ztellman/gloss
+;;
+;; This library was born of frustration, and its primary purpose is to
+;; make this kind of development more agile. Of course, that comes
+;; with a price: this is strictly for decoding, there is no
+;; encoder. With that price paid, the library aims to please the
+;; developer, by being very easy to extend programmatically, and by
+;; being designed to work iteratively.
+;;
+;; While this way is not entirely idiomatic, as it does encapsulate -
+;; and rely - on state, whenever it is possible, the library aims to
+;; provide idiomatic interfaces.
+
 (ns balabit.blobbity
-  "Binary blob decoding functions.
-
-  Within this namespace live a few functions and macros, all tailored
-  towards one single purpose: extracting various primitive types out
-  of a ByteBuffer. The goal is to be able to write a simple C
-  struct-like specification for this purpose."
-
   ^{:author "Gergely Nagy <algernon@balabit.hu>"
     :copyright "Copyright (C) 2012 Gergely Nagy <algernon@balabit.hu>"
     :license {:name "Eclipse Public License - v 1.0"
@@ -14,9 +39,19 @@
   (:use [balabit.blobbity.typecast])
   (:import (java.nio ByteBuffer)))
 
-;; We need to pre-declare `decode-blob`, because certain frame
-;; decoders (`:struct`, in particular) will need to use it.
+; We need to pre-declare `decode-blob`, because certain frame
+; decoders (`:struct`, in particular) will need to use it.
 (declare decode-blob)
+
+;; ## Decoding a single frame
+;;
+;; Decoding a single frame is the heart of the library, and is
+;; accomplished by the `decode-frame` multi-method. The major reason
+;; for using a multi-method is extensibility: the library provides
+;; decoders for most primitive types, and a few common constructs
+;; only. Everything else can be implemented by adding a new method to
+;; the multi-method, with the appropriate dispatch key.
+;;
 
 (defmulti decode-frame
   "Decode a single frame from a `ByteBuffer` of the specified type.
@@ -30,6 +65,19 @@
   {:arglists '([buffer type & options])}
 
   (fn [#^ByteBuffer _ type & _] type))
+
+;; ### Primitive types
+;;
+;; Primitive types are those that `java.nio.ByteBuffer` has readers
+;; for (and their unsigned counterpart). Decoding these all follow the
+;; same pattern: we use the Java method to decode the type, coerce it
+;; into the desired type, and - optionally - perform a transformation,
+;; such as turning a signed integer into unsigned.
+;;
+;; Due to this common root, this functionality was extracted into a
+;; macro, that can be used to define a new method for the
+;; `decode-frame` multi-method:
+;;
 
 (defmacro defdfm
   "Create and install a frame decoding method for a particular `type`,
@@ -46,37 +94,58 @@
          (~typecast)
          (~transform))))
 
+;;
+;; Armed with the macro, we can implement the decoders for the
+;; primitive types:
+;;
+
 ;; Decoding a signed byte is done via the `get` method of
-;; ByteBuffer. The result is coerced into a byte, and no
+;; `ByteBuffer`. The result is coerced into a byte, and no
 ;; transformation is applied.
 (defdfm :byte .get byte identity)
-;; Decoding an unsigned byte is similar, with the difference being that
-;; a byte->ubyte transformation gets applied too.
+;; Decoding an unsigned byte is similar, with the difference being
+;; that a `byte->ubyte` transformation gets applied too.
 (defdfm :ubyte .get byte byte->ubyte)
 
 ;; Decoding a signed 16-bit integer is doen via the `getShort' method
-;; of ByteBuffer. The result is coerced into a short, and no
+;; of `ByteBuffer`. The result is coerced into a short, and no
 ;; transformation is applied.
 (defdfm :int16 .getShort short identity)
 ;; Decoding an unsigned 16-bit integer is similar, with the difference
-;; being that a short->ushort transformation gets applied too.
+;; being that a `short->ushort` transformation gets applied too.
 (defdfm :uint16 .getShort short short->ushort)
 
 ;; Decoding a signed 32-bit integer is doen via the `getInt' method of
-;; ByteBuffer. The result is coerced into a short, and no
+;; `ByteBuffer`. The result is coerced into a short, and no
 ;; transformation is applied.
 (defdfm :int32 .getInt int identity)
 ;; Decoding an unsigned 32-bit integer is similar, with the difference
-;; being that a int->uint transformation gets applied too.
+;; being that a `int->uint` transformation gets applied too.
 (defdfm :uint32 .getInt int int->uint)
 
 ;; Decoding a signed 64-bit integer is doen via the `getLong' method
-;; of ByteBuffer. The result is coerced into a short, and no
+;; of `ByteBuffer`. The result is coerced into a short, and no
 ;; transformation is applied.
 (defdfm :int64 .getLong long identity)
 ;; Decoding an unsigned 64-bit integer is similar, with the difference
-;; being that a long->ulong transformation gets applied too.
+;; being that a `long->ulong` transformation gets applied too.
 (defdfm :uint64 .getLong long long->ulong)
+
+;; ### Compound, but common types
+;;
+;; Apart from the primitive types, there are a few common constructs
+;; the library supports out of the box, such as various kinds of
+;; strings, and structures (them themselves built up from other frames
+;; `decode-frame` can work with).
+
+;; First, we have three kinds of strings: one where we know the length
+;; in advance (often used as magic markers); one where we do not know
+;; the length, but it is NULL-terminated (a C string); and the third
+;; is one where the string is prefixed by a numeric frame, that tells
+;; us its length.
+;;
+;; These three string-y types are the first compound types the library
+;; implements.
 
 ;; Decoding a string of a specific length is done by reading the
 ;; required amount of bytes into an array, and turning that back into
@@ -112,14 +181,23 @@
   (let [len (decode-frame buffer prefix-type)]
     (decode-frame buffer :string len)))
 
-;; Mostly for aesthetic reasons, it is sometimes advisable to have
-;; deeper nesting in the returned map. This is best achieved by
-;; introducing a special `:struct` frame decoder, which dispatches to
-;; `decode-blob`, defined just below.
+;; However, it is not only strings we want to handle here, but structs
+;; too! Structs that are built up from other frames. We'll see later
+;; how these are described when we get to the `decode-blob`
+;; function. Nevertheless, structs allows us to embed frames within
+;; other frames, and give the result structure.
 (defmethod decode-frame :struct
   [#^ByteBuffer buffer _ struct-spec]
 
   (decode-blob buffer struct-spec))
+
+;; ### Skipping & slicing
+;;
+;; Finally, we implement skipping & slicing, which are not really
+;; decoding functions, as they serve a different purpose. Including
+;; them, however, serves the purpose of making it that much easier to
+;; encapsulate padding and uninteresting binary blobs.
+;;
 
 ;; Binary files sometimes contain padding, which we do not wish to
 ;; read at all, just to discard them. The `:skip` method comes in
@@ -144,6 +222,13 @@
     (.order blob order)))
 
 ;; ----------------------------------------------------------------
+;; ## Decoding a set of frames
+;;
+;; Now that we have the foundations laid out, we can build on top of
+;; it: we can build a function to which we can give a C struct-like
+;; specification, and it will returns us a map of data. We'll call
+;; this function `decode-blob`, but we will have to implement a few
+;; helper functions first:
 
 (defmulti decoder-dispatch
   "Given an element spec, dispatch it to the appropriate
