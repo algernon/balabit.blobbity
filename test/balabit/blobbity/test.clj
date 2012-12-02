@@ -74,6 +74,11 @@
       (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :string 5) "MAGIC"))
       (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC\0") :c-string) "MAGIC"))
 
+      (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :pred-string
+                                (partial = (byte (int \C))))
+             "MAGI"))
+      (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :delimited-string [\G]) "MA"))
+
       (is (= (blob/decode-frame (wrap-string-in-prefixed-buffer "Awesome!")
                                 :prefixed-string :int32) "Awesome!")))
 

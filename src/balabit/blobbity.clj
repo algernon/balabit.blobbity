@@ -138,13 +138,13 @@
 ;; strings, and structures (them themselves built up from other frames
 ;; `decode-frame` can work with).
 
-;; First, we have three kinds of strings: one where we know the length
+;; First, we have a few kinds of strings: one where we know the length
 ;; in advance (often used as magic markers); one where we do not know
-;; the length, but it is NULL-terminated (a C string); and the third
-;; is one where the string is prefixed by a numeric frame, that tells
-;; us its length.
+;; the length, but it is terminated by a delimiter (a C string is a
+;; variant of this); and the third is one where the string is prefixed
+;; by a numeric frame, that tells us its length.
 ;;
-;; These three string-y types are the first compound types the library
+;; These string-y types are the first compound types the library
 ;; implements.
 
 ;; Decoding a string of a specific length is done by reading the
@@ -157,6 +157,30 @@
         _ (.get buffer b)]
     (String. b)))
 
+;; Strings are often stored by having a terminal condition, this
+;; method implements a generic decoder, where we use a predicate
+;; function to determine when a string ends.
+(defmethod decode-frame :pred-string
+  [#^ByteBuffer buffer _ pred?]
+
+  (loop [acc []]
+    (let [c (decode-frame buffer :byte)]
+      (if (pred? c)
+        (String. (byte-array acc))
+        (recur (conj acc c))))))
+
+;; When strings can end at any char within another array, they're
+;; delimited by those chars. With the `:delimited-string` method,
+;; these can be easily decoded. For example, a double-colon terminated
+;; string can be read as:
+;;
+;;     (decode-frame buffer :delimited-string [\:])
+(defmethod decode-frame :delimited-string
+  [#^ByteBuffer buffer _ delimiters]
+
+  (let [byte-delimiters (map #(byte (int %1)) delimiters)]
+    (decode-frame buffer :pred-string (fn [c] (some #{c} byte-delimiters)))))
+
 ;; Decoding NULL-terminated C-like strings is slightly more
 ;; complicated, as the buffer must be read until the first NULL-byte
 ;; only, but we have no indication of its length.
@@ -166,11 +190,7 @@
 (defmethod decode-frame :c-string
   [#^ByteBuffer buffer _]
 
-  (loop [acc []]
-    (let [c (decode-frame buffer :byte)]
-      (if (zero? c)
-        (String. (byte-array acc))
-        (recur (conj acc c))))))
+  (decode-frame buffer :pred-string zero?))
 
 ;; A construct that can be observed often, is a length-prefixed
 ;; string. To make it easy to decode these, `:prefixed-string` can be
