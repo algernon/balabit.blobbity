@@ -1,17 +1,8 @@
 # balabit.blobbity
 
-When it comes to picking out bits and pieces from binary data, the
-go-to library is most often [Gloss][1] - a great library, but it has
-one major downside: it wants to decode the whole buffer,
-always. Working iteratively with it is inconvenient at best.
-
-This library is my answer to this need: blobbity is a very simple
-library that allows one to write C struct-like specifications, and
-extract primitives out of a ByteBuffer, even if there is data left
-past what the spec describes. This makes it possible to easily build
-up a binary parser iteratively.
-
- [1]: https://github.com/ztellman/gloss
+This library was born out of a need to have a simply extensible binary
+data decoding library, which can work iteratively. That is all it
+does, and hopefully does it well.
 
 ### Installation
 
@@ -40,6 +31,25 @@ following spec:
                           :header-len :uint16
                           :tail-offset :uint32])
 ```
+
+As an example for extending the decoders, to parse a [netstring][2],
+we'd only need to introduce a decoder for it:
+
+```clojure
+(defmethod blob/decode-frame :netstring
+  [#^ByteBuffer buffer _]
+
+  (let [len (Integer/parseInt (blob/decode-frame buffer :delimited-string [\:]))
+        netstr (blob/decode-frame buffer :string len)]
+    (blob/decode-frame buffer :skip 1)
+    netstr))
+```
+
+ [2]: http://en.wikipedia.org/wiki/Netstring
+
+For more information, see the [API documentation][3].
+
+ [3]: http://algernon.github.com/balabit.blobbity/
 
 ## License
 
