@@ -6,6 +6,9 @@
             :distribution :repo}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.4.0"]]
-  :profiles {:dev {:plugins [[lein-marginalia "0.7.1"]]}}
+  :profiles {:dev {:plugins [[lein-marginalia "0.7.1"]
+                             [lein-guzheng "0.4.5"]]}}
   :aliases {"docs" ["with-profile" "dev" "marg"
-                    "src/balabit/blobbity.clj"]})
+                    "src/balabit/blobbity.clj"]
+            "test-coverage" ["with-profile" "dev" "guzheng" "balabit.blobbity"
+                             "--" "test"]})
