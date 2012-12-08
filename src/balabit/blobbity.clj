@@ -361,14 +361,15 @@
 (defn decode-blob-array
   "Decode all frames of the same type from a ByteBuffer. Use this when
   you have a buffer that contains an unspecified number of frames of
-  the same type.
+  the same type. The optional arguments following the type are passed
+  onto the frame decoder verbatim.
 
   Returns a lazy sequence."
 
-  [#^ByteBuffer buffer type]
+  [#^ByteBuffer buffer type & options]
 
   (let [step (fn [#^ByteBuffer buffer type]
                (when-not (= (.position buffer) (.limit buffer))
-                 (cons (decode-frame buffer type)
-                       (decode-blob-array buffer type))))]
+                 (cons (apply (partial decode-frame buffer type) options)
+                       (apply (partial decode-blob-array buffer type) options))))]
     (lazy-seq (step buffer type))))

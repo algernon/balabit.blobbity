@@ -185,4 +185,14 @@
                [-1 -1]))
         (is (= (.position buff) 2))
         (is (= (blob/decode-blob-array buff :byte)
-               [-1 -1 -1 -1 -1 -1 -1 -1]))))))
+               [-1 -1 -1 -1 -1 -1 -1 -1]))))
+
+    (testing "... with options"
+      (is (= (blob/decode-blob-array (wrap-string-in-prefixed-buffer "MAGIC")
+                                     :prefixed :string :uint32)
+             '("MAGIC"))))
+
+    (testing "... with options and structs"
+      (is (= (blob/decode-blob-array (wrap-string-in-prefixed-buffer "MAGIC")
+                                     :struct [:magic [:prefixed :string :uint32]])
+             '({:magic "MAGIC"}))))))
