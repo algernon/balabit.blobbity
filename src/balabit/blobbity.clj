@@ -304,15 +304,17 @@
   key-spec pair, and depending on a few things, decides how to proceed
   with them.
 
-  If the key is `:skip`, then it will skip as many bytes as specified,
-  otherwise it will dispatch to `decoder-dispatch` to get the value,
-  and assoc it into the result if it is not `nil`. If it is, the map
-  will be returned unchanged."
+  If the key is `:skip`, then it will skip as many bytes as
+  specified (and return the map unchanged), otherwise it will dispatch
+  to `decoder-dispatch` to get the value, and assoc it into the result
+  if it is not `nil`. If it is, the map will be returned unchanged."
 
   [buffer m [key elem-spec]]
 
   (if (= key :skip)
-    (decode-frame buffer :skip elem-spec)
+    (do
+      (decode-frame buffer :skip elem-spec)
+      m)
     (let [v (decoder-dispatch buffer elem-spec)]
       (if v
         (assoc m key v)

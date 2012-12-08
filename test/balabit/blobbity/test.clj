@@ -138,10 +138,11 @@
 
     (testing "of skipping bytes from within a spec"
       (let [skip-spec [:dummy [:skip 4]
-                       :skip 2
+                       :two :byte
+                       :skip 1
                        :byte :byte]]
         (is (= (blob/decode-blob (make-test-buffer) skip-spec)
-               {:byte -1}))))
+               {:byte -1, :two 2}))))
 
     (testing "with slicing the buffer up in the process"
       (let [test-buffer (make-test-buffer)
