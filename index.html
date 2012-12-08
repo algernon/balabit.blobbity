@@ -3137,8 +3137,7 @@ strings, and structures (them themselves built up from other frames
 </td><td class="codes"></td></tr><tr><td class="docs"><p>First, we have a few kinds of strings: one where we know the length
 in advance (often used as magic markers); one where we do not know
 the length, but it is terminated by a delimiter (a C string is a
-variant of this); and the third is one where the string is prefixed
-by a numeric frame, that tells us its length.</p>
+variant of this).</p>
 
 <p>These string-y types are the first compound types the library
 implements.</p>
@@ -3180,14 +3179,7 @@ NULL-byte.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :c-string
   [#^ByteBuffer buffer _]
 
-  (decode-frame buffer :pred-string zero?))</pre></td></tr><tr><td class="docs"><p>A construct that can be observed often, is a length-prefixed
-string. To make it easy to decode these, <code>:prefixed-string</code> can be
-used, which takes a single parameter, the type of the prefix.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :prefixed-string
-  [#^ByteBuffer buffer _ prefix-type]
-
-  (let [len (decode-frame buffer prefix-type)]
-    (decode-frame buffer :string len)))</pre></td></tr><tr><td class="docs"><p>However, it is not only strings we want to handle here, but structs
+  (decode-frame buffer :pred-string zero?))</pre></td></tr><tr><td class="docs"><p>However, it is not only strings we want to handle here, but structs
 too! Structs that are built up from other frames. We'll see later
 how these are described when we get to the <code>decode-blob</code>
 function. Nevertheless, structs allows us to embed frames within
@@ -3219,7 +3211,32 @@ current buffer position, limited to the specified length.</p>
   (let [order (.order buffer)
         #^ByteBuffer blob (-&gt; buffer .slice (.limit length))]
     (decode-frame buffer :skip length)
-    (.order blob order)))</pre></td></tr><tr><td class="docs"><hr />
+    (.order blob order)))</pre></td></tr><tr><td class="docs"><h3>Wrapping things up</h3>
+
+<p>In binary formats, it is fairly common to have a length prefix
+before a given blob of data. This is a generic enough
+functionality, that we introduce a decoder for this kind of
+wrapping: One, that in addition to the usual decode-frame arguments
+takes a <code>data-type</code> and a <code>prefix-type</code> argument aswell.</p>
+
+<p>It first decodes the length, using <code>prefix-type</code>, then decodes the
+data, dispatching on <code>data-type</code> and supplying the extracted length
+as an additional argument.</p>
+
+<p>This, of course, assumes that the prefix-type returns something
+numeric, and that the method we dispatch to for the data takes an
+additional length argument.</p>
+
+<p>For example, to read a string that is prefixed by a 32-bit length,
+we can do the following with this decoder method:</p>
+
+<pre><code>(decode-frame buffer :prefixed :string :uint32)
+</code></pre>
+</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :prefixed
+  [#^ByteBuffer buffer _ data-type prefix-type]
+
+  (let [len (decode-frame buffer prefix-type)]
+    (decode-frame buffer data-type len)))</pre></td></tr><tr><td class="docs"><hr />
 
 <h2>Decoding a set of frames</h2>
 
@@ -3254,12 +3271,13 @@ use the value, whether to expect an argument, or just a type.</p>
     (class options)))</pre></td></tr><tr><td class="docs"><p>If the elem-spec is a keyword, pass it on to read-element as-is.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decoder-dispatch clojure.lang.Keyword
   [#^ByteBuffer buffer type]
-  (decode-frame buffer type))</pre></td></tr><tr><td class="docs"><p>If the elem-spec is not a keyword, then assume it is a [type
-options] vector, so destructure it, and pass it onwards.</p>
+  (decode-frame buffer type))</pre></td></tr><tr><td class="docs"><p>If the elem-spec is not a keyword, then assume it is a [type &amp;
+options] vector, so destructure it, and pass it onwards. Care is
+taken to pass all options along, as there can be multiple ones.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decoder-dispatch :default
-  [#^ByteBuffer buffer [type options]]
+  [#^ByteBuffer buffer [type &amp; options]]
 
-  (decode-frame buffer type options))</pre></td></tr><tr><td class="docs"><p>We also want to allow one to easily skip parts of a binary blob,
+  (apply (partial decode-frame buffer type) options))</pre></td></tr><tr><td class="docs"><p>We also want to allow one to easily skip parts of a binary blob,
 and skipping does not need, and should not need a dummy key
 name. Instead, skipping should be inlineable, with <code>:skip</code> taking
 the place of the key, and its argument the place of value:</p>
@@ -3271,14 +3289,16 @@ the place of the key, and its argument the place of value:</p>
   key-spec pair, and depending on a few things, decides how to proceed
   with them.</p>
 
-<p>  If the key is <code>:skip</code>, then it will skip as many bytes as specified,
-  otherwise it will dispatch to <code>decoder-dispatch</code> to get the value,
-  and assoc it into the result if it is not <code>nil</code>. If it is, the map
-  will be returned unchanged.</p>
+<p>  If the key is <code>:skip</code>, then it will skip as many bytes as
+  specified (and return the map unchanged), otherwise it will dispatch
+  to <code>decoder-dispatch</code> to get the value, and assoc it into the result
+  if it is not <code>nil</code>. If it is, the map will be returned unchanged.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn- skip-or-decode
   [buffer m [key elem-spec]]
   (if (= key :skip)
-    (decode-frame buffer :skip elem-spec)
+    (do
+      (decode-frame buffer :skip elem-spec)
+      m)
     (let [v (decoder-dispatch buffer elem-spec)]
       (if v
         (assoc m key v)
@@ -3299,14 +3319,15 @@ the place of the key, and its argument the place of value:</p>
   (assert (even? (count spec)))
   (reduce (partial skip-or-decode buffer) {} (partition 2 spec)))</pre></td></tr><tr><td class="docs"><p>Decode all frames of the same type from a ByteBuffer. Use this when
   you have a buffer that contains an unspecified number of frames of
-  the same type.</p>
+  the same type. The optional arguments following the type are passed
+  onto the frame decoder verbatim.</p>
 
 <p>  Returns a lazy sequence.</p>
 </td><td class="codes"><pre class="brush: clojure">(defn decode-blob-array
-  [#^ByteBuffer buffer type]
+  [#^ByteBuffer buffer type &amp; options]
   (let [step (fn [#^ByteBuffer buffer type]
                (when-not (= (.position buffer) (.limit buffer))
-                 (cons (decode-frame buffer type)
-                       (decode-blob-array buffer type))))]
+                 (cons (apply (partial decode-frame buffer type) options)
+                       (apply (partial decode-blob-array buffer type) options))))]
     (lazy-seq (step buffer type))))</pre></td></tr><tr><td class="spacer docs">&nbsp;</td><td class="codes" /></tr></table><div class="footer">Generated by <a href="https://github.com/fogus/marginalia">Marginalia</a>.&nbsp;&nbsp;Syntax highlighting provided by Alex Gorbatchev's <a href="http://alexgorbatchev.com/SyntaxHighlighter/">SyntaxHighlighter</a></div><script type="text/javascript">SyntaxHighlighter.defaults['gutter'] = false;
        SyntaxHighlighter.all()</script></body></html>
