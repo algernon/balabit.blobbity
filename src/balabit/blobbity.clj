@@ -141,8 +141,7 @@
 ;; First, we have a few kinds of strings: one where we know the length
 ;; in advance (often used as magic markers); one where we do not know
 ;; the length, but it is terminated by a delimiter (a C string is a
-;; variant of this); and the third is one where the string is prefixed
-;; by a numeric frame, that tells us its length.
+;; variant of this).
 ;;
 ;; These string-y types are the first compound types the library
 ;; implements.
@@ -192,15 +191,6 @@
 
   (decode-frame buffer :pred-string zero?))
 
-;; A construct that can be observed often, is a length-prefixed
-;; string. To make it easy to decode these, `:prefixed-string` can be
-;; used, which takes a single parameter, the type of the prefix.
-(defmethod decode-frame :prefixed-string
-  [#^ByteBuffer buffer _ prefix-type]
-
-  (let [len (decode-frame buffer prefix-type)]
-    (decode-frame buffer :string len)))
-
 ;; However, it is not only strings we want to handle here, but structs
 ;; too! Structs that are built up from other frames. We'll see later
 ;; how these are described when we get to the `decode-blob`
@@ -240,6 +230,32 @@
         #^ByteBuffer blob (-> buffer .slice (.limit length))]
     (decode-frame buffer :skip length)
     (.order blob order)))
+
+;; ### Wrapping things up
+;;
+;; In binary formats, it is fairly common to have a length prefix
+;; before a given blob of data. This is a generic enough
+;; functionality, that we introduce a decoder for this kind of
+;; wrapping: One, that in addition to the usual decode-frame arguments
+;; takes a `data-type` and a `prefix-type` argument aswell.
+;;
+;; It first decodes the length, using `prefix-type`, then decodes the
+;; data, dispatching on `data-type` and supplying the extracted length
+;; as an additional argument.
+;;
+;; This, of course, assumes that the prefix-type returns something
+;; numeric, and that the method we dispatch to for the data takes an
+;; additional length argument.
+;;
+;; For example, to read a string that is prefixed by a 32-bit length,
+;; we can do the following with this decoder method:
+;;
+;;     (decode-frame buffer :prefixed :string :uint32)
+(defmethod decode-frame :prefixed
+  [#^ByteBuffer buffer _ data-type prefix-type]
+
+  (let [len (decode-frame buffer prefix-type)]
+    (decode-frame buffer data-type len)))
 
 ;; ----------------------------------------------------------------
 ;; ## Decoding a set of frames
@@ -282,12 +298,13 @@
   [#^ByteBuffer buffer type]
   (decode-frame buffer type))
 
-;; If the elem-spec is not a keyword, then assume it is a [type
-;; options] vector, so destructure it, and pass it onwards.
+;; If the elem-spec is not a keyword, then assume it is a [type &
+;; options] vector, so destructure it, and pass it onwards. Care is
+;; taken to pass all options along, as there can be multiple ones.
 (defmethod decoder-dispatch :default
-  [#^ByteBuffer buffer [type options]]
+  [#^ByteBuffer buffer [type & options]]
 
-  (decode-frame buffer type options))
+  (apply (partial decode-frame buffer type) options))
 
 ;;
 ;; We also want to allow one to easily skip parts of a binary blob,

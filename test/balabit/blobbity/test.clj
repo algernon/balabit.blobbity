@@ -77,10 +77,14 @@
       (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :pred-string
                                 (partial = (byte (int \C))))
              "MAGI"))
-      (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :delimited-string [\G]) "MA"))
+      (is (= (blob/decode-frame (wrap-string-in-buffer "MAGIC") :delimited-string [\G]) "MA")))
 
+    (testing "of prefixed types"
       (is (= (blob/decode-frame (wrap-string-in-prefixed-buffer "Awesome!")
-                                :prefixed-string :int32) "Awesome!")))
+                                :prefixed :string :int32) "Awesome!"))
+      (is (= (.limit #^ByteBuffer (blob/decode-frame (wrap-string-in-prefixed-buffer "Awesome!")
+                                                     :prefixed :slice :int32))
+             8)))
 
     (testing "of composite types"
 
@@ -99,7 +103,7 @@
                        :magic-ubyte :ubyte
                        :magic-int64 :int64
                        :magic-uint64 :uint64
-                       :magic-prefixed-string [:prefixed-string :byte]
+                       :magic-prefixed-string [:prefixed :string :byte]
                        :magic-string [:string 5]
                        :magic-c-string :c-string]]
 
@@ -122,7 +126,7 @@
                                          :ubyte :ubyte
                                          :int64 :int64
                                          :uint64 :uint64]]
-                         :strings [:struct [:prefixed [:prefixed-string :byte]
+                         :strings [:struct [:prefixed [:prefixed :string :byte]
                                             :string [:string 5]
                                             :c-string :c-string]]]]
         (is (= (blob/decode-blob (make-test-buffer) nested-spec)
@@ -157,7 +161,18 @@
         (is (= (blob/decode-blob test-buffer ubyte-spec) {:ubyte 255}))
         (is (= (blob/decode-blob (:two-ints inner-stuff) inner-spec)
                {:int32 16843009
-                :int16 514}))))))
+                :int16 514}))))
+
+    (testing "of prefixed things"
+      (let [spec [:prefixed-string [:prefixed :string :uint32]]]
+        (is (= (blob/decode-blob (wrap-string-in-prefixed-buffer "MAGIC")
+                                 spec)
+               {:prefixed-string "MAGIC"})))
+      (let [spec [:prefixed-slice [:prefixed :slice :uint32]]]
+        (is (= (.limit #^ByteBuffer
+                       (:prefixed-slice (blob/decode-blob (wrap-string-in-prefixed-buffer "MAGIC")
+                                                          spec)))
+               5))))))
 
 (deftest decode-blob-array-test
   (testing "Decoding multiple homogenous frames from a ByteBuffer"
