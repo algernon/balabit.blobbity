@@ -1,4 +1,4 @@
-(defproject org.clojars.algernon/balabit.blobbity "0.1.0-SNAPSHOT"
+(defproject com.balabit/balabit.blobbity "0.1.0"
   :description "Simple and stupid byte-format reading DSL."
   :url "https://github.com/algernon/balabit.blobbity"
   :license {:name "Eclipse Public License - v 1.0"

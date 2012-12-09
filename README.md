@@ -10,7 +10,7 @@ Blobbity is available on Clojars. Add this `dependency` to your
 Leiningen `project.clj`:
 
 ```clojure
-[org.clojars.algernon/balabit.blobbity "0.1.0-SNAPSHOT"]
+[com.balabit/balabit.blobbity "0.1.0"]
 ```
 
 ## Usage
