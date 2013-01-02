@@ -7,3 +7,7 @@ jdk:
 script:
   - lein2 docs
   - lein2 test-coverage
+notifications:
+ irc:
+   channels:
+     - "irc.freenode.net#balabit"
