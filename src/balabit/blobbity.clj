@@ -265,8 +265,8 @@
 (defmethod decode-frame :prefixed
   [#^ByteBuffer buffer _ data-type prefix-type]
 
-  (let [len (decode-frame buffer prefix-type)]
-    (decode-frame buffer data-type len)))
+  (decode-frame buffer data-type
+                (decode-frame buffer prefix-type)))
 
 ;; ----------------------------------------------------------------
 ;; ## Decoding a set of frames
