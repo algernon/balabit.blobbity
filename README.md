@@ -53,6 +53,6 @@ For more information, see the [API documentation][3].
 
 ## License
 
-Copyright © 2012 Gergely Nagy <algernon@balabit.hu>
+Copyright © 2012-2013 Gergely Nagy <algernon@balabit.hu>
 
 Distributed under the Eclipse Public License, which is also used by Clojure.
