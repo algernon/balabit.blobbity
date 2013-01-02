@@ -1,7 +1,8 @@
 (ns balabit.blobbity.test
   (:use [clojure.test])
   (:require [balabit.blobbity :as blob])
-  (:import java.nio.ByteBuffer))
+  (:import (java.nio ByteBuffer)
+           (java.util Arrays)))
 
 (defn minus-one-buffer [n]
   (ByteBuffer/wrap (byte-array (take n (repeat (byte -1))))))
@@ -92,7 +93,10 @@
                                 :struct [:magic? [:string 5]])
              {:magic? "MAGIC"}))
 
-      (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2)))))
+      (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2))
+
+      (is (Arrays/equals (blob/decode-frame (wrap-string-in-buffer "Array") :array 5)
+                         (byte-array (map #(byte (int %)) "Array")))))))
 
 (deftest decode-blob-test
   (testing "Blob decoding"

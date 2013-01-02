@@ -32,7 +32,7 @@
 
 (ns balabit.blobbity
   ^{:author "Gergely Nagy <algernon@balabit.hu>"
-    :copyright "Copyright (C) 2012 Gergely Nagy <algernon@balabit.hu>"
+    :copyright "Copyright (C) 2012-2013 Gergely Nagy <algernon@balabit.hu>"
     :license {:name "Eclipse Public License - v 1.0"
               :url "http://www.eclipse.org/legal/epl-v10.html"}}
 
@@ -131,16 +131,59 @@
 ;; being that a `long->ulong` transformation gets applied too.
 (defdfm :uint64 .getLong long long->ulong)
 
+;; ### Skipping & slicing
+;;
+;; First, we implement skipping & slicing, which are not really
+;; decoding functions, as they serve a different purpose. Including
+;; them, however, serves the purpose of making it that much easier to
+;; encapsulate padding and uninteresting binary blobs.
+;;
+
+;; Binary files sometimes contain padding, which we do not wish to
+;; read at all, just to discard them. The `:skip` method comes in
+;; handy in these cases, as it simply positions the buffer a few bytes
+;; further.
+(defmethod decode-frame :skip
+  [#^ByteBuffer buffer _ n]
+
+  (.position buffer (+ (.position buffer) n))
+  nil)
+
+;; And for those cases where one needs a subsection of the buffer to
+;; do further decoding upon, the `:slice` decoder can be used. Give it
+;; a length, and it will spit out a ByteBuffer that starts at the
+;; current buffer position, limited to the specified length.
+(defmethod decode-frame :slice
+  [#^ByteBuffer buffer _ length]
+
+  (let [order (.order buffer)
+        #^ByteBuffer blob (-> buffer .slice (.limit length))]
+    (decode-frame buffer :skip length)
+    (.order blob order)))
+
+;; Similar to `:slice`, the `:array` decoder extracts a subsection of
+;; the buffer, but instead of returning a ByteBuffer, it returns a
+;; byte array. This is to be used in cases where the result is to be
+;; passed onto another Java constructor that expects an array (such as
+;; String).
+(defmethod decode-frame :array
+  [#^ByteBuffer buffer _ length]
+
+  (let [a (byte-array length)]
+    (.get buffer a)
+    a))
+
 ;; ### Compound, but common types
 ;;
-;; Apart from the primitive types, there are a few common constructs
-;; the library supports out of the box, such as various kinds of
-;; strings, and structures (them themselves built up from other frames
-;; `decode-frame` can work with).
+;; Apart from the primitive types, and the padding and slicing
+;; decoders, there are a few common constructs the library supports
+;; out of the box, such as various kinds of strings, and structures
+;; (them themselves built up from other frames `decode-frame` can work
+;; with).
 
-;; First, we have a few kinds of strings: one where we know the length
-;; in advance (often used as magic markers); one where we do not know
-;; the length, but it is terminated by a delimiter (a C string is a
+;; We have a few kinds of strings: one where we know the length in
+;; advance (often used as magic markers); one where we do not know the
+;; length, but it is terminated by a delimiter (a C string is a
 ;; variant of this).
 ;;
 ;; These string-y types are the first compound types the library
@@ -152,9 +195,7 @@
 (defmethod decode-frame :string
   [#^ByteBuffer buffer _ length]
 
-  (let [b (byte-array length)
-        _ (.get buffer b)]
-    (String. b)))
+  (String. (decode-frame buffer :array length)))
 
 ;; Strings are often stored by having a terminal condition, this
 ;; method implements a generic decoder, where we use a predicate
@@ -200,36 +241,6 @@
   [#^ByteBuffer buffer _ struct-spec]
 
   (decode-blob buffer struct-spec))
-
-;; ### Skipping & slicing
-;;
-;; Finally, we implement skipping & slicing, which are not really
-;; decoding functions, as they serve a different purpose. Including
-;; them, however, serves the purpose of making it that much easier to
-;; encapsulate padding and uninteresting binary blobs.
-;;
-
-;; Binary files sometimes contain padding, which we do not wish to
-;; read at all, just to discard them. The `:skip` method comes in
-;; handy in these cases, as it simply positions the buffer a few bytes
-;; further.
-(defmethod decode-frame :skip
-  [#^ByteBuffer buffer _ n]
-
-  (.position buffer (+ (.position buffer) n))
-  nil)
-
-;; And for those cases where one needs a subsection of the buffer to
-;; do further decoding upon, the `:slice` decoder can be used. Give it
-;; a length, and it will spit out a ByteBuffer that starts at the
-;; current buffer position, limited to the specified length.
-(defmethod decode-frame :slice
-  [#^ByteBuffer buffer _ length]
-
-  (let [order (.order buffer)
-        #^ByteBuffer blob (-> buffer .slice (.limit length))]
-    (decode-frame buffer :skip length)
-    (.order blob order)))
 
 ;; ### Wrapping things up
 ;;
