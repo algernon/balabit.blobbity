@@ -95,8 +95,8 @@
 
       (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2))
 
-      (is (Arrays/equals (blob/decode-frame (wrap-string-in-buffer "Array") :array 5)
-                         (byte-array (map #(byte (int %)) "Array")))))))
+      (is (Arrays/equals #^bytes (blob/decode-frame (wrap-string-in-buffer "Array") :array 5)
+                                 (byte-array (map #(byte (int %)) "Array")))))))
 
 (deftest decode-blob-test
   (testing "Blob decoding"

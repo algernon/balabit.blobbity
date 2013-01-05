@@ -195,7 +195,7 @@
 (defmethod decode-frame :string
   [#^ByteBuffer buffer _ length]
 
-  (String. (decode-frame buffer :array length)))
+  (String. #^bytes (decode-frame buffer :array length)))
 
 ;; Strings are often stored by having a terminal condition, this
 ;; method implements a generic decoder, where we use a predicate
