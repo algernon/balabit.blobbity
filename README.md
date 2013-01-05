@@ -1,5 +1,7 @@
 # balabit.blobbity
 
+[![Build Status](https://travis-ci.org/algernon/balabit.blobbity.png?branch=master)](https://travis-ci.org/algernon/balabit.blobbity)
+
 This library was born out of a need to have a simply extensible binary
 data decoding library, which can work iteratively. That is all it
 does, and hopefully does it well.
