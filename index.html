@@ -3028,7 +3028,7 @@ net.brehaut.ClojureTools = (function (SH) {
     build_tree: build_tree
   };
 })(SyntaxHighlighter);
-</script><title>com.balabit/balabit.blobbity -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">com.balabit/balabit.blobbity</h1><h2 class="project-version">0.1.0</h2><br /><p>Simple and stupid byte-format reading DSL.</p>
+</script><title>com.balabit/balabit.blobbity -- Marginalia</title></head><body><table><tr><td class="docs"><div class="header"><h1 class="project-name">com.balabit/balabit.blobbity</h1><h2 class="project-version">0.1.1</h2><br /><p>Simple and stupid byte-format reading DSL.</p>
 </div><div class="dependencies"><h3>dependencies</h3><table><tr><td class="dep-name">org.clojure/clojure</td><td class="dotted"><hr /></td><td class="dep-version">1.4.0</td></tr></table></div></td><td class="codes" style="text-align: center; vertical-align: middle;color: #666;padding-right:20px"><br /><br /><br />(this space intentionally left almost blank)</td></tr><tr><td class="docs"><div class="toc"><a name="toc"><h3>namespaces</h3></a><ul><li><a href="#balabit.blobbity">balabit.blobbity</a></li></ul></div></td><td class="codes">&nbsp;</td></tr><tr><td class="docs"><div class="docs-header"><a class="anchor" href="#balabit.blobbity" name="balabit.blobbity"><h1 class="project-name">balabit.blobbity</h1><a class="toc-link" href="#toc">toc</a></a></div></td><td class="codes" /></tr><tr><td class="docs"><h2>Decoding binary data</h2>
 
 <p>Most often, when one needs to interface with other software, there
@@ -3061,7 +3061,7 @@ provide idiomatic interfaces.</p>
 </td><td class="codes"></td></tr><tr><td class="docs">
 </td><td class="codes"><pre class="brush: clojure">(ns balabit.blobbity
   ^{:author &quot;Gergely Nagy &lt;algernon@balabit.hu&gt;&quot;
-    :copyright &quot;Copyright (C) 2012 Gergely Nagy &lt;algernon@balabit.hu&gt;&quot;
+    :copyright &quot;Copyright (C) 2012-2013 Gergely Nagy &lt;algernon@balabit.hu&gt;&quot;
     :license {:name &quot;Eclipse Public License - v 1.0&quot;
               :url &quot;http://www.eclipse.org/legal/epl-v10.html&quot;}}
   (:use [balabit.blobbity.typecast])
@@ -3128,15 +3128,50 @@ of <code>ByteBuffer</code>. The result is coerced into a short, and no
 transformation is applied.</p>
 </td><td class="codes"><pre class="brush: clojure">(defdfm :int64 .getLong long identity)</pre></td></tr><tr><td class="docs"><p>Decoding an unsigned 64-bit integer is similar, with the difference
 being that a <code>long-&gt;ulong</code> transformation gets applied too.</p>
-</td><td class="codes"><pre class="brush: clojure">(defdfm :uint64 .getLong long long-&gt;ulong)</pre></td></tr><tr><td class="docs"><h3>Compound, but common types</h3>
+</td><td class="codes"><pre class="brush: clojure">(defdfm :uint64 .getLong long long-&gt;ulong)</pre></td></tr><tr><td class="docs"><h3>Skipping & slicing</h3>
 
-<p>Apart from the primitive types, there are a few common constructs
-the library supports out of the box, such as various kinds of
-strings, and structures (them themselves built up from other frames
-<code>decode-frame</code> can work with).</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>First, we have a few kinds of strings: one where we know the length
-in advance (often used as magic markers); one where we do not know
-the length, but it is terminated by a delimiter (a C string is a
+<p>First, we implement skipping &amp; slicing, which are not really
+decoding functions, as they serve a different purpose. Including
+them, however, serves the purpose of making it that much easier to
+encapsulate padding and uninteresting binary blobs.</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>Binary files sometimes contain padding, which we do not wish to
+read at all, just to discard them. The <code>:skip</code> method comes in
+handy in these cases, as it simply positions the buffer a few bytes
+further.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :skip
+  [#^ByteBuffer buffer _ n]
+
+  (.position buffer (+ (.position buffer) n))
+  nil)</pre></td></tr><tr><td class="docs"><p>And for those cases where one needs a subsection of the buffer to
+do further decoding upon, the <code>:slice</code> decoder can be used. Give it
+a length, and it will spit out a ByteBuffer that starts at the
+current buffer position, limited to the specified length.</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :slice
+  [#^ByteBuffer buffer _ length]
+
+  (let [order (.order buffer)
+        #^ByteBuffer blob (-&gt; buffer .slice (.limit length))]
+    (decode-frame buffer :skip length)
+    (.order blob order)))</pre></td></tr><tr><td class="docs"><p>Similar to <code>:slice</code>, the <code>:array</code> decoder extracts a subsection of
+the buffer, but instead of returning a ByteBuffer, it returns a
+byte array. This is to be used in cases where the result is to be
+passed onto another Java constructor that expects an array (such as
+String).</p>
+</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :array
+  [#^ByteBuffer buffer _ length]
+
+  (let [a (byte-array length)]
+    (.get buffer a)
+    a))</pre></td></tr><tr><td class="docs"><h3>Compound, but common types</h3>
+
+<p>Apart from the primitive types, and the padding and slicing
+decoders, there are a few common constructs the library supports
+out of the box, such as various kinds of strings, and structures
+(them themselves built up from other frames <code>decode-frame</code> can work
+with).</p>
+</td><td class="codes"></td></tr><tr><td class="docs"><p>We have a few kinds of strings: one where we know the length in
+advance (often used as magic markers); one where we do not know the
+length, but it is terminated by a delimiter (a C string is a
 variant of this).</p>
 
 <p>These string-y types are the first compound types the library
@@ -3147,9 +3182,7 @@ a string.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :string
   [#^ByteBuffer buffer _ length]
 
-  (let [b (byte-array length)
-        _ (.get buffer b)]
-    (String. b)))</pre></td></tr><tr><td class="docs"><p>Strings are often stored by having a terminal condition, this
+  (String. #^bytes (decode-frame buffer :array length)))</pre></td></tr><tr><td class="docs"><p>Strings are often stored by having a terminal condition, this
 method implements a generic decoder, where we use a predicate
 function to determine when a string ends.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :pred-string
@@ -3187,31 +3220,7 @@ other frames, and give the result structure.</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :struct
   [#^ByteBuffer buffer _ struct-spec]
 
-  (decode-blob buffer struct-spec))</pre></td></tr><tr><td class="docs"><h3>Skipping & slicing</h3>
-
-<p>Finally, we implement skipping &amp; slicing, which are not really
-decoding functions, as they serve a different purpose. Including
-them, however, serves the purpose of making it that much easier to
-encapsulate padding and uninteresting binary blobs.</p>
-</td><td class="codes"></td></tr><tr><td class="docs"><p>Binary files sometimes contain padding, which we do not wish to
-read at all, just to discard them. The <code>:skip</code> method comes in
-handy in these cases, as it simply positions the buffer a few bytes
-further.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :skip
-  [#^ByteBuffer buffer _ n]
-
-  (.position buffer (+ (.position buffer) n))
-  nil)</pre></td></tr><tr><td class="docs"><p>And for those cases where one needs a subsection of the buffer to
-do further decoding upon, the <code>:slice</code> decoder can be used. Give it
-a length, and it will spit out a ByteBuffer that starts at the
-current buffer position, limited to the specified length.</p>
-</td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :slice
-  [#^ByteBuffer buffer _ length]
-
-  (let [order (.order buffer)
-        #^ByteBuffer blob (-&gt; buffer .slice (.limit length))]
-    (decode-frame buffer :skip length)
-    (.order blob order)))</pre></td></tr><tr><td class="docs"><h3>Wrapping things up</h3>
+  (decode-blob buffer struct-spec))</pre></td></tr><tr><td class="docs"><h3>Wrapping things up</h3>
 
 <p>In binary formats, it is fairly common to have a length prefix
 before a given blob of data. This is a generic enough
@@ -3235,8 +3244,8 @@ we can do the following with this decoder method:</p>
 </td><td class="codes"><pre class="brush: clojure">(defmethod decode-frame :prefixed
   [#^ByteBuffer buffer _ data-type prefix-type]
 
-  (let [len (decode-frame buffer prefix-type)]
-    (decode-frame buffer data-type len)))</pre></td></tr><tr><td class="docs"><hr />
+  (decode-frame buffer data-type
+                (decode-frame buffer prefix-type)))</pre></td></tr><tr><td class="docs"><hr />
 
 <h2>Decoding a set of frames</h2>
 
