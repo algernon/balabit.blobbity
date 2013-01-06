@@ -4,6 +4,7 @@
   :license {:name "Eclipse Public License - v 1.0"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo}
+  :scm {:url "git@github.com:algernon/balabit.blobbity.git"}
   :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.4.0"]]
   :profiles {:dev {:plugins [[lein-marginalia "0.7.1"]
