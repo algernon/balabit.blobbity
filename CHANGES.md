@@ -1,4 +1,4 @@
-# balabit.blobbity 0.1.1-SNAPSHOT (git master)
+# balabit.blobbity 0.1.1 (2013-01-06)
 
 ## New decoders
 
