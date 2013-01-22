@@ -1,4 +1,4 @@
-(ns balabit.blobbity.test
+(ns balabit.blobbity_test
   (:use [clojure.test])
   (:require [balabit.blobbity :as blob])
   (:import (java.nio ByteBuffer)
