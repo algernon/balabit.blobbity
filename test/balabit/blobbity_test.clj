@@ -100,6 +100,9 @@
 
 (deftest decode-blob-test
   (testing "Blob decoding"
+    (testing "of an invalid spec"
+      (is (thrown? AssertionError (blob/decode-blob nil [:no-type-for-this-key]))))
+
     (testing "of a flat blob spec"
       (let [flat-spec [:magic-int32 :int32
                        :magic-int16 :int16
