@@ -197,17 +197,31 @@
 
   (String. #^bytes (decode-frame buffer :array length)))
 
-;; Strings are often stored by having a terminal condition, this
-;; method implements a generic decoder, where we use a predicate
-;; function to determine when a string ends.
+;; Strings are often stored by having a terminal condition, to easily
+;; decode data from these, we introduce a helper function first:
+
+(defn- buffer-seq
+  "Turn a ByteBuffer into a lazy sequence of decoded bytes. The
+  underlying buffer is mutated by the function, position is
+  preserved."
+
+  [#^ByteBuffer buffer start]
+
+  (lazy-seq
+   (when (< start (.limit buffer))
+     (cons (decode-frame buffer :byte)
+           (buffer-seq buffer (inc start))))))
+
+;; With the helper function, we can implement a generic
+;; predicate-based string decoder, that'll extract a string up until
+;; the predicate becomes true.
 (defmethod decode-frame :pred-string
   [#^ByteBuffer buffer _ pred?]
 
-  (loop [acc []]
-    (let [c (decode-frame buffer :byte)]
-      (if (pred? c)
-        (String. (byte-array acc))
-        (recur (conj acc c))))))
+  (-> (take-while (complement pred?)
+                  (buffer-seq buffer (.position buffer)))
+      byte-array
+      String.))
 
 ;; When strings can end at any char within another array, they're
 ;; delimited by those chars. With the `:delimited-string` method,
