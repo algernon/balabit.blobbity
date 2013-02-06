@@ -173,6 +173,18 @@
     (.get buffer a)
     a))
 
+;; Similar to the `:array` decode, `:as-sequence` extracts multiple
+;; elements from the buffer, returning a lazy sequence. The elements
+;; are decoded using optional custom arguments, each element with the
+;; same parameters.
+(defmethod decode-frame :as-sequence
+  [#^ByteBuffer buffer _ & decode-params]
+
+  (lazy-seq
+   (when (< (.position buffer) (.limit buffer))
+     (cons (apply decode-frame buffer decode-params)
+           (apply decode-frame buffer :as-sequence decode-params)))))
+
 ;; ### Compound, but common types
 ;;
 ;; Apart from the primitive types, and the padding and slicing
@@ -198,28 +210,14 @@
   (String. #^bytes (decode-frame buffer :array length)))
 
 ;; Strings are often stored by having a terminal condition, to easily
-;; decode data from these, we introduce a helper function first:
-
-(defn- buffer-seq
-  "Turn a ByteBuffer into a lazy sequence of decoded bytes. The
-  underlying buffer is mutated by the function, position is
-  preserved."
-
-  [#^ByteBuffer buffer start]
-
-  (lazy-seq
-   (when (< start (.limit buffer))
-     (cons (decode-frame buffer :byte)
-           (buffer-seq buffer (inc start))))))
-
-;; With the helper function, we can implement a generic
-;; predicate-based string decoder, that'll extract a string up until
-;; the predicate becomes true.
+;; decode data from these, we have a generic predicate-based string
+;; decoder, that'll extract a string up until the predicate becomes
+;; true.
 (defmethod decode-frame :pred-string
   [#^ByteBuffer buffer _ pred?]
 
   (-> (take-while (complement pred?)
-                  (buffer-seq buffer (.position buffer)))
+                  (decode-frame buffer :as-sequence :byte))
       byte-array
       String.))
 
@@ -393,8 +391,4 @@
 
   [#^ByteBuffer buffer type & options]
 
-  (let [step (fn [#^ByteBuffer buffer type]
-               (when-not (= (.position buffer) (.limit buffer))
-                 (cons (apply (partial decode-frame buffer type) options)
-                       (apply (partial decode-blob-array buffer type) options))))]
-    (lazy-seq (step buffer type))))
+  (apply decode-frame buffer :as-sequence type options))

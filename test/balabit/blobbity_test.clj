@@ -93,6 +93,10 @@
                                 :struct [:magic? [:string 5]])
              {:magic? "MAGIC"}))
 
+      (is (= (apply str (map char (blob/decode-frame (wrap-string-in-buffer "MAGIC")
+                                                     :as-sequence :byte)))
+             "MAGIC"))
+
       (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2))
 
       (is (Arrays/equals #^bytes (blob/decode-frame (wrap-string-in-buffer "Array") :array 5)
