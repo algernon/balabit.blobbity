@@ -173,17 +173,17 @@
     (.get buffer a)
     a))
 
-;; Similar to the `:array` decode, `:as-sequence` extracts multiple
+;; Similar to the `:array` decode, `:sequence` extracts multiple
 ;; elements from the buffer, returning a lazy sequence. The elements
 ;; are decoded using optional custom arguments, each element with the
 ;; same parameters.
-(defmethod decode-frame :as-sequence
+(defmethod decode-frame :sequence
   [#^ByteBuffer buffer _ & decode-params]
 
   (lazy-seq
    (when (< (.position buffer) (.limit buffer))
      (cons (apply decode-frame buffer decode-params)
-           (apply decode-frame buffer :as-sequence decode-params)))))
+           (apply decode-frame buffer :sequence decode-params)))))
 
 ;; ### Compound, but common types
 ;;
@@ -217,7 +217,7 @@
   [#^ByteBuffer buffer _ pred?]
 
   (-> (take-while (complement pred?)
-                  (decode-frame buffer :as-sequence :byte))
+                  (decode-frame buffer :sequence :byte))
       byte-array
       String.))
 
@@ -391,4 +391,4 @@
 
   [#^ByteBuffer buffer type & options]
 
-  (apply decode-frame buffer :as-sequence type options))
+  (apply decode-frame buffer :sequence type options))

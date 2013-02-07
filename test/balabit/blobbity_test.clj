@@ -94,7 +94,7 @@
              {:magic? "MAGIC"}))
 
       (is (= (apply str (map char (blob/decode-frame (wrap-string-in-buffer "MAGIC")
-                                                     :as-sequence :byte)))
+                                                     :sequence :byte)))
              "MAGIC"))
 
       (is (= (.limit #^ByteBuffer (blob/decode-frame (minus-one-buffer 4) :slice 2)) 2))

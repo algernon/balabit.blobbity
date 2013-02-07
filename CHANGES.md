@@ -2,12 +2,12 @@
 
 ## New decoders
 
-### `(decode-frame *buffer* :as-sequence *type* & *params*)`
+### `(decode-frame *buffer* :sequence *type* & *params*)`
 
-The new `:as-sequence` decoder supersedes the former
-`decode-blob-array` function (which is kept for backwards
-compatibility). Given a `:type` and any extra parameters, it returns a
-lazy sequence of decoded frames of the given type.
+The new `:sequence` decoder supersedes the former `decode-blob-array`
+function (which is kept for backwards compatibility). Given a `:type`
+and any extra parameters, it returns a lazy sequence of decoded frames
+of the given type.
 
 # balabit.blobbity 0.1.1 (2013-01-06)
 
