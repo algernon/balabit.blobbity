@@ -51,7 +51,7 @@ we'd only need to introduce a decoder for it:
 
 For more information, see the [API documentation][3].
 
- [3]: http://algernon.github.com/balabit.blobbity/
+ [3]: http://algernon.github.io/balabit.blobbity/
 
 ## License
 
