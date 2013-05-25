@@ -58,6 +58,8 @@
                   (vec (doall (map #(byte (int %1)) "MAGIC")))
                   (vec (doall (map #(byte (int %1)) "c-string\0"))))))))
 
+(blob/decode-frame (wrap-string-in-buffer "DEADBEEF") :int64)
+
 (deftest decode-frame-test
   (testing "Single frame decoding"
     (testing "of numeric types"
@@ -68,6 +70,8 @@
       (is (= (blob/decode-frame (minus-one-buffer 4) :int32) -1))
       (is (= (blob/decode-frame (minus-one-buffer 4) :uint32) 4294967295))
       (is (= (blob/decode-frame (minus-one-buffer 8) :int64) -1))
+      (is (= (blob/decode-frame (wrap-string-in-buffer "DEADBEEF") :int64)
+             4919409929397552454))
       (is (= (blob/decode-frame (minus-one-buffer 8) :uint64) 18446744073709551615N)))
 
     (testing "of string-y types"
